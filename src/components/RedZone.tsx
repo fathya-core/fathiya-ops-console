@@ -18,7 +18,7 @@ export function RedZone() {
             <AlertOctagon size={15} className="text-rose-400" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-slate-100">المنطقة الحمراء</h2>
+            <h2 className="text-sm font-semibold text-stone-100">المنطقة الحمراء</h2>
             <div className="font-mono text-[10px] text-rose-300/80 tracking-wider">RED ZONE · LOCKED</div>
           </div>
         </div>
@@ -28,30 +28,37 @@ export function RedZone() {
       </div>
 
       <div className="p-5">
-        <p className="text-xs text-slate-400 mb-5 leading-6">
+        <p className="text-xs text-stone-400 mb-5 leading-6">
           كل الإجراءات الخارجية مُقفلة. يتطلب تنفيذها أمراً بشرياً صريحاً خارج هذه الواجهة.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {actions.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              disabled
-              title="Locked — requires explicit command."
-              className="group relative text-right rounded-lg border border-slate-800 bg-ink-950/60 p-4 opacity-80 cursor-not-allowed hover:border-rose-500/40 transition"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-9 h-9 rounded-md bg-rose-500/5 border border-rose-500/20 flex items-center justify-center">
-                  <a.icon size={15} className="text-rose-300/80" />
+            <div key={a.label} className="group relative">
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-9 right-1/2 translate-x-1/2 z-20 whitespace-nowrap rounded-md border border-rose-500/30 bg-ink-950 px-2.5 py-1.5 text-[11px] font-mono text-rose-200 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                مقفل — يتطلب أمرًا صريحًا
+                <span className="absolute -bottom-1 right-1/2 translate-x-1/2 w-2 h-2 rotate-45 bg-ink-950 border-b border-r border-rose-500/30" />
+              </div>
+
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                className="w-full text-right rounded-lg border border-stone-800 bg-ink-950/60 p-4 opacity-80 cursor-not-allowed hover:border-rose-500/40 transition"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-9 h-9 rounded-md bg-rose-500/5 border border-rose-500/20 flex items-center justify-center">
+                    <a.icon size={15} className="text-rose-300/80" />
+                  </div>
+                  <Lock size={14} className="text-rose-400/80" />
                 </div>
-                <Lock size={14} className="text-rose-400/80" />
-              </div>
-              <div className="text-sm font-medium text-slate-200">{a.label}</div>
-              <div className="text-[11px] text-slate-500 mb-3">{a.sub}</div>
-              <div className="text-[11px] font-mono text-rose-300/80 border-t border-slate-800/80 pt-2.5">
-                Locked — requires explicit command.
-              </div>
-            </button>
+                <div className="text-sm font-medium text-stone-200">{a.label}</div>
+                <div className="text-[11px] text-stone-500 mb-3">{a.sub}</div>
+                <div className="text-[11px] font-mono text-rose-300/80 border-t border-stone-800/80 pt-2.5">
+                  Locked — requires explicit command.
+                </div>
+              </button>
+            </div>
           ))}
         </div>
       </div>

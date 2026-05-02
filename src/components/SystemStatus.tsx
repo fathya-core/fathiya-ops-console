@@ -4,7 +4,7 @@ type Status = 'active' | 'mock' | 'connected-guarded' | 'disconnected' | 'draft'
 
 const statusStyles: Record<Status, { label: string; dot: string; text: string; bg: string }> = {
   active: { label: 'Active', dot: 'bg-gold-300', text: 'text-gold-200', bg: 'bg-gold-600/10 border-gold-600/30' },
-  mock: { label: 'Mock', dot: 'bg-gold-400', text: 'text-gold-300', bg: 'bg-gold-600/10 border-gold-600/20' },
+  mock: { label: 'Local Mock', dot: 'bg-gold-400', text: 'text-gold-300', bg: 'bg-gold-600/10 border-gold-600/20' },
   'connected-guarded': { label: 'Connected · Guarded', dot: 'bg-amber-400', text: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/20' },
   disconnected: { label: 'Not Connected', dot: 'bg-stone-500', text: 'text-stone-400', bg: 'bg-stone-700/20 border-stone-700/50' },
   draft: { label: 'Draft Only', dot: 'bg-amber-400', text: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/20' },

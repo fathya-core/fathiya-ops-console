@@ -12,11 +12,13 @@ export type LogEntry = {
 export type ActivityContextType = {
   entries: LogEntry[];
   addEntry: (entry: Omit<LogEntry, 'id' | 'timestamp' | 'status'>) => void;
+  clearEntries: () => void;
 };
 
 export const ActivityContext = createContext<ActivityContextType>({
   entries: [],
   addEntry: () => {},
+  clearEntries: () => {},
 });
 
 export const useActivity = () => useContext(ActivityContext);
