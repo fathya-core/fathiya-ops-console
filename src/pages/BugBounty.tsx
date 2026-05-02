@@ -7,6 +7,8 @@ import {
 import { Field, Input, Textarea, SectionCard, PrimaryButton } from '../components/ui';
 import { generateBugBounty, SAMPLE_BUG_BOUNTY_INPUT } from '../lib/mock';
 import { runBugBountyQualityGate } from '../lib/quality-gate';
+import { buildBugBountyPayload, useBridge } from '../lib/bridge';
+import { useAudit } from '../lib/audit';
 import { supabase } from '../lib/supabase';
 import { useActivity } from '../lib/activity';
 import type { BugBountyOutput, QualityResult, View } from '../types';
@@ -24,6 +26,8 @@ export function BugBounty({ onNavigate }: { onNavigate: (v: View) => void }) {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const { addEntry, markExported } = useActivity();
+  const { addPayload } = useBridge();
+  const { addAuditEntry } = useAudit();
   const [logId, setLogId] = useState<string | null>(null);
 
   async function runEngine(params: typeof SAMPLE_BUG_BOUNTY_INPUT) {
@@ -50,15 +54,23 @@ export function BugBounty({ onNavigate }: { onNavigate: (v: View) => void }) {
       qualityStatus: quality.passed ? 'passed' : 'failed',
     });
 
+    addAuditEntry({ actor: 'fathiya', event_type: 'draft_generated', module: 'bug_bounty', risk_level: 'medium', summary: `Bug Bounty draft for ${params.programName || 'Unnamed'}` });
+
+    if (quality.passed) {
+      addAuditEntry({ actor: 'fathiya', event_type: 'quality_gate_passed', module: 'bug_bounty', risk_level: 'medium', summary: 'QG passed' });
+      const draftMd = buildExportMarkdown(output, quality);
+      const payload = buildBugBountyPayload(output, quality, draftMd);
+      addPayload(payload);
+      addAuditEntry({ actor: 'fathiya', event_type: 'payload_created', module: 'bridge', risk_level: 'medium', summary: `Payload created: ${payload.title}` });
+    } else {
+      addAuditEntry({ actor: 'fathiya', event_type: 'quality_gate_failed', module: 'bug_bounty', risk_level: 'medium', summary: `QG failed: ${quality.blockedTerms.join(', ')}` });
+    }
+
     try {
       await supabase.from('bug_bounty_reports').insert({
-        program_name: params.programName,
-        policy_url: params.policyUrl,
-        allowed_scope: params.allowedScope,
-        forbidden_scope: params.forbiddenScope,
-        assets: params.assets,
-        notes: params.notes,
-        output,
+        program_name: params.programName, policy_url: params.policyUrl,
+        allowed_scope: params.allowedScope, forbidden_scope: params.forbiddenScope,
+        assets: params.assets, notes: params.notes, output,
       });
       setSaved(true);
     } catch { /* local-only fallback */ }
@@ -331,12 +343,25 @@ function OutputPanel({
   logId: string | null;
   onExported: () => void;
 }) {
+  const { addAuditEntry } = useAudit();
+  const safeName = (output.programName || 'program').replace(/[^a-z0-9]/gi, '_').toUpperCase().slice(0, 30);
+
   function onExport() {
     const ts = Date.now();
-    const safeName = (output.programName || 'program').replace(/[^a-z0-9]/gi, '_').toUpperCase().slice(0, 30);
     const md = buildExportMarkdown(output, quality);
     downloadMd(`FATHIYA_BUG_BOUNTY_${safeName}_${ts}.md`, md);
     onExported();
+    addAuditEntry({ actor: 'user', event_type: 'exported_markdown', module: 'bug_bounty', risk_level: 'medium', summary: `Markdown exported for ${output.programName}` });
+  }
+
+  function onExportJson() {
+    const ts = Date.now();
+    const blob = new Blob([JSON.stringify({ output, quality, generated: new Date().toISOString() }, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `FATHIYA_PAYLOAD_BUG_BOUNTY_${safeName}_${ts}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    addAuditEntry({ actor: 'user', event_type: 'exported_json', module: 'bug_bounty', risk_level: 'medium', summary: `JSON payload exported for ${output.programName}` });
   }
 
   return (
@@ -351,13 +376,22 @@ function OutputPanel({
             QG PASSED
           </span>
         </div>
-        <button
-          onClick={onExport}
-          className="inline-flex items-center gap-1.5 text-xs text-gold-300 hover:text-gold-100 transition px-3 py-1.5 rounded-md border border-gold-600/30 hover:border-gold-400/60 bg-gold-600/5"
-        >
-          <Download size={13} />
-          Export Markdown
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onExport}
+            className="inline-flex items-center gap-1.5 text-xs text-gold-300 hover:text-gold-100 transition px-3 py-1.5 rounded-md border border-gold-600/30 hover:border-gold-400/60 bg-gold-600/5"
+          >
+            <Download size={13} />
+            Markdown
+          </button>
+          <button
+            onClick={onExportJson}
+            className="inline-flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-100 transition px-3 py-1.5 rounded-md border border-amber-600/30 hover:border-amber-400/60 bg-amber-500/5"
+          >
+            <Download size={13} />
+            JSON
+          </button>
+        </div>
       </div>
 
       <SectionCard title="خريطة النطاق" tag="SCOPE MAP" icon={<Map size={14} />} accent="gold">

@@ -7,9 +7,11 @@ import {
 import { Field, Input, Select, Textarea, SectionCard, PrimaryButton } from '../components/ui';
 import { generateMarketIntel, SAMPLE_MARKET_INTEL_INPUT } from '../lib/mock';
 import { runMarketIntelQualityGate } from '../lib/quality-gate';
+import { buildMarketIntelPayload, useBridge } from '../lib/bridge';
+import { useAudit } from '../lib/audit';
 import { supabase } from '../lib/supabase';
 import { useActivity } from '../lib/activity';
-import type { MarketIntelOutput, QualityResult, View } from '../types';
+import type { MarketIntelOutput, QualityResult, BridgeRiskLevel, View } from '../types';
 
 type RunResult = { output: MarketIntelOutput; quality: QualityResult };
 
@@ -24,6 +26,8 @@ export function MarketIntel({ onNavigate }: { onNavigate: (v: View) => void }) {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const { addEntry, markExported } = useActivity();
+  const { addPayload } = useBridge();
+  const { addAuditEntry } = useAudit();
   const [logId, setLogId] = useState<string | null>(null);
 
   async function runEngine(params: typeof SAMPLE_MARKET_INTEL_INPUT) {
@@ -40,6 +44,8 @@ export function MarketIntel({ onNavigate }: { onNavigate: (v: View) => void }) {
     const id = crypto.randomUUID();
     setLogId(id);
 
+    const bridgeRisk: BridgeRiskLevel = params.riskLevel === 'low' ? 'low' : params.riskLevel === 'high' ? 'high' : 'medium';
+
     addEntry({
       module: 'Market Intel',
       inputSummary: `${params.asset || 'N/A'} · ${params.timeframe} · ${params.marketContext}`,
@@ -49,12 +55,28 @@ export function MarketIntel({ onNavigate }: { onNavigate: (v: View) => void }) {
       qualityStatus: quality.passed ? 'passed' : 'failed',
     });
 
+    addAuditEntry({
+      actor: 'fathiya',
+      event_type: 'draft_generated',
+      module: 'market_intel',
+      risk_level: params.riskLevel,
+      summary: `Market Intel draft for ${params.asset || 'N/A'} · ${params.timeframe}`,
+    });
+
+    if (quality.passed) {
+      addAuditEntry({ actor: 'fathiya', event_type: 'quality_gate_passed', module: 'market_intel', risk_level: params.riskLevel, summary: 'QG passed' });
+      const draftMd = buildDraftMarkdownForBridge(output, quality, params);
+      const payload = buildMarketIntelPayload(output, quality, draftMd, bridgeRisk);
+      addPayload(payload);
+      addAuditEntry({ actor: 'fathiya', event_type: 'payload_created', module: 'bridge', risk_level: params.riskLevel, summary: `Payload created: ${payload.title}` });
+    } else {
+      addAuditEntry({ actor: 'fathiya', event_type: 'quality_gate_failed', module: 'market_intel', risk_level: params.riskLevel, summary: `QG failed: ${quality.blockedTerms.join(', ')}` });
+    }
+
     try {
       await supabase.from('market_intel_reports').insert({
-        asset: params.asset,
-        timeframe: params.timeframe,
-        data_source: params.dataSource,
-        risk_level: params.riskLevel,
+        asset: params.asset, timeframe: params.timeframe,
+        data_source: params.dataSource, risk_level: params.riskLevel,
         notes: [params.marketContext ? `سياق السوق: ${params.marketContext}` : '', params.notes].filter(Boolean).join('\n\n'),
         output,
       });
@@ -265,6 +287,14 @@ function QualityGateFailPanel({ quality, onRetry }: { quality: QualityResult; on
   );
 }
 
+function buildDraftMarkdownForBridge(
+  output: MarketIntelOutput,
+  quality: QualityResult,
+  params: { asset: string; timeframe: string; marketContext: string; dataSource: string; riskLevel: string; notes: string },
+) {
+  return buildExportMarkdown(output, quality, params);
+}
+
 function buildExportMarkdown(
   output: MarketIntelOutput,
   quality: QualityResult,
@@ -353,6 +383,7 @@ function OutputPanel({
   logId: string | null;
   onExported: () => void;
 }) {
+  const { addAuditEntry } = useAudit();
   const conf = output.confidenceScore;
   const confColor: 'gold' | 'amber' | 'rose' = conf >= 70 ? 'gold' : conf >= 50 ? 'amber' : 'rose';
   const confColorHex = conf >= 70 ? '#e4c57f' : conf >= 50 ? '#fbbf24' : '#fb7185';
@@ -363,6 +394,18 @@ function OutputPanel({
     const md = buildExportMarkdown(output, quality, params);
     downloadMd(`FATHIYA_MARKET_INTEL_${safeAsset}_${ts}.md`, md);
     onExported();
+    addAuditEntry({ actor: 'user', event_type: 'exported_markdown', module: 'market_intel', risk_level: params.riskLevel, summary: `Markdown exported for ${params.asset}` });
+  }
+
+  function onExportJson() {
+    const ts = Date.now();
+    const safeAsset = (params.asset || 'market').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+    const blob = new Blob([JSON.stringify({ output, quality, params, generated: new Date().toISOString() }, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `FATHIYA_PAYLOAD_MARKET_INTEL_${safeAsset}_${ts}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    addAuditEntry({ actor: 'user', event_type: 'exported_json', module: 'market_intel', risk_level: params.riskLevel, summary: `JSON payload exported for ${params.asset}` });
   }
 
   return (
@@ -379,13 +422,22 @@ function OutputPanel({
             QG PASSED
           </span>
         </div>
-        <button
-          onClick={onExport}
-          className="inline-flex items-center gap-1.5 text-xs text-gold-300 hover:text-gold-100 transition px-3 py-1.5 rounded-md border border-gold-600/30 hover:border-gold-400/60 bg-gold-600/5"
-        >
-          <Download size={13} />
-          Export Markdown
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onExport}
+            className="inline-flex items-center gap-1.5 text-xs text-gold-300 hover:text-gold-100 transition px-3 py-1.5 rounded-md border border-gold-600/30 hover:border-gold-400/60 bg-gold-600/5"
+          >
+            <Download size={13} />
+            Markdown
+          </button>
+          <button
+            onClick={onExportJson}
+            className="inline-flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-100 transition px-3 py-1.5 rounded-md border border-amber-600/30 hover:border-amber-400/60 bg-amber-500/5"
+          >
+            <Download size={13} />
+            JSON
+          </button>
+        </div>
       </div>
 
       <SectionCard title="الفرضية المركزية" tag="CORE THESIS" icon={<Sparkles size={14} />} accent="gold">

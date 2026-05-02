@@ -1,4 +1,4 @@
-import { LineChart, Bug, ArrowLeft, Activity, Lock, FlaskConical } from 'lucide-react';
+import { LineChart, Bug, ArrowLeft, Activity, Lock, FlaskConical, ListChecks, Workflow } from 'lucide-react';
 import type { View } from '../types';
 import { SystemStatus } from '../components/SystemStatus';
 import { RedZone } from '../components/RedZone';
@@ -39,28 +39,54 @@ export function Home({ onNavigate }: { onNavigate: (v: View) => void }) {
           <ModuleCard
             tag="MODULE · 01"
             title="استخبارات السوق"
-            subtitle="Market Intel"
-            description="تحليل هيكلي للأصول: سيناريوهات، مستويات إبطال، إشارات إنذار مبكر، ودرجة ثقة. مخرجات مسودة فقط — لا تنفيذ تداولي."
+            subtitle="Market Intel Engine v0"
+            description="محرك فرضيات محلي — سيناريوهات، شروط إبطال، إشارات مراقبة، حدود حكم. Quality Gate مدمج. مسودة فقط."
             icon={LineChart}
             stats={[
-              { label: 'أصول مدعومة', value: '∞' },
-              { label: 'إطارات زمنية', value: '7' },
-              { label: 'حالة التنفيذ', value: 'معطّل' },
+              { label: 'Quality Gate', value: 'مفعّل' },
+              { label: 'Bridge Payload', value: 'تلقائي' },
+              { label: 'التنفيذ', value: 'معطّل' },
             ]}
             onClick={() => onNavigate('market')}
           />
           <ModuleCard
             tag="MODULE · 02"
             title="مكافآت الثغرات"
-            subtitle="Bug Bounty"
-            description="خريطة نطاقات، جرد أصول، فرضيات ثغرات، وقوالب أدلة. تخطيط آمن بدون أي فحص أو استغلال فعلي."
+            subtitle="Bug Bounty Engine v0"
+            description="محرك تخطيط آمن محلي — خرائط نطاق، فرضيات، قوائم تحقق، قوالب مسودة. لا فحص ولا استغلال فعلي."
             icon={Bug}
             stats={[
-              { label: 'قوالب تقارير', value: 'جاهزة' },
-              { label: 'فحص فعلي', value: 'لا' },
+              { label: 'Quality Gate', value: 'مفعّل' },
+              { label: 'Bridge Payload', value: 'تلقائي' },
               { label: 'وضع المخرجات', value: 'مسودة' },
             ]}
             onClick={() => onNavigate('bounty')}
+          />
+          <ModuleCard
+            tag="BRIDGE · 01"
+            title="طابور الموافقة"
+            subtitle="Approval Queue"
+            description="كل Payload تم توليده ينتظر هنا. عرض، تصدير JSON، أو رفض. زر التنفيذ مقفل حتى موافقة بشرية صريحة."
+            icon={ListChecks}
+            stats={[
+              { label: 'Payloads', value: 'محلية' },
+              { label: 'Execute', value: 'مقفل' },
+              { label: 'Export JSON', value: 'متاح' },
+            ]}
+            onClick={() => onNavigate('approval')}
+          />
+          <ModuleCard
+            tag="BRIDGE · 02"
+            title="مخطط n8n"
+            subtitle="n8n Bridge Blueprint"
+            description="تصميم سير العمل المستقبلي — 6 عقد من الاستقبال للتنفيذ. كل العقد في وضع Mock/Disabled حالياً."
+            icon={Workflow}
+            stats={[
+              { label: 'عقد العمل', value: '6' },
+              { label: 'الحالة', value: 'Blueprint' },
+              { label: 'التنفيذ', value: 'معطّل' },
+            ]}
+            onClick={() => onNavigate('n8n')}
           />
         </div>
 
