@@ -29,30 +29,9 @@ function saveActivity(entries: LogEntry[]) {
   try { localStorage.setItem(ACT_LS_KEY, JSON.stringify(entries)); } catch { /* ignore */ }
 }
 
-function App() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+function AppShell({ session }: { session: Session }) {
   const [view, setView] = useState<View>('home');
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Loading state while session resolves
-  if (session === undefined) {
-    return (
-      <div className="min-h-screen bg-ink-950 flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  if (!session) return <Login />;
-
-  // Activity log
   const [entries, setEntries] = useState<LogEntry[]>(loadActivity);
 
   const addEntry = useCallback((entry: Omit<LogEntry, 'id' | 'timestamp' | 'status' | 'exported'>) => {
@@ -85,7 +64,6 @@ function App() {
     [entries, addEntry, markExported, clearEntries],
   );
 
-  // Bridge payloads
   const [payloads, setPayloads] = useState<FathiyaBridgePayload[]>(loadPayloads);
 
   const addPayload = useCallback((p: FathiyaBridgePayload) => {
@@ -106,7 +84,6 @@ function App() {
     [payloads, addPayload, clearPayloads],
   );
 
-  // Audit log
   const [auditEntries, setAuditEntries] = useState<AuditLogEntry[]>(loadAuditEntries);
 
   const addAuditEntry = useCallback((entry: Omit<AuditLogEntry, 'id' | 'timestamp'>) => {
@@ -128,6 +105,8 @@ function App() {
     () => ({ auditEntries, addAuditEntry, clearAudit }),
     [auditEntries, addAuditEntry, clearAudit],
   );
+
+  void session;
 
   return (
     <ActivityContext.Provider value={actCtx}>
@@ -156,6 +135,30 @@ function App() {
       </BridgeContext.Provider>
     </ActivityContext.Provider>
   );
+}
+
+function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) {
+    return (
+      <div className="min-h-screen bg-ink-950 flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!session) return <Login />;
+
+  return <AppShell session={session} />;
 }
 
 export default App;
